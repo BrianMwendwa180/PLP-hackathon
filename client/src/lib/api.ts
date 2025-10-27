@@ -58,6 +58,10 @@ export interface LandParcel {
     email: string;
   };
   landUseType: string;
+  soilType?: string;
+  vegetationType?: string;
+  irrigationType?: string;
+  climateZone?: string;
   createdAt: string;
 }
 
@@ -76,6 +80,8 @@ export interface SoilHealthRecord {
   potassiumLevel?: number;
   organicMatter?: number;
   temperature?: number;
+  rainfall?: number;
+  erosionRate?: number;
   dataSource: string;
   recordedAt: string;
   createdAt: string;
@@ -146,6 +152,29 @@ export interface DegradationAlert {
   resolvedAt?: string;
 }
 
+export interface IoTSensor {
+  _id: string;
+  parcelId: {
+    _id: string;
+    name: string;
+    location: string;
+  };
+  sensorType: string;
+  sensorId: string;
+  name: string;
+  location: string;
+  status: string;
+  lastSeen: string;
+  thresholds?: {
+    min?: number;
+    max?: number;
+    criticalMin?: number;
+    criticalMax?: number;
+  };
+  units?: string;
+  createdAt: string;
+}
+
 export interface AuthResponse {
   message: string;
   token: string;
@@ -178,7 +207,7 @@ export const landParcelsAPI = {
   getParcelById: (id: string) => api.get<LandParcel>(`/land-parcels/${id}`),
   createParcel: (data: Omit<LandParcel, '_id' | 'ownerId' | 'createdAt'>) =>
     api.post<{ message: string; landParcel: LandParcel }>('/land-parcels', data),
-  updateParcel: (id: string, data: Partial<LandParcel>) =>
+  updateParcel: (id: string, data: Partial<Omit<LandParcel, '_id' | 'ownerId' | 'createdAt'>>) =>
     api.put<{ message: string; landParcel: LandParcel }>(`/land-parcels/${id}`, data),
   deleteParcel: (id: string) => api.delete<{ message: string }>(`/land-parcels/${id}`),
 };
@@ -229,6 +258,28 @@ export const alertsAPI = {
   updateAlert: (id: string, data: Partial<DegradationAlert>) =>
     api.put<{ message: string; alert: DegradationAlert }>(`/alerts/${id}`, data),
   deleteAlert: (id: string) => api.delete<{ message: string }>(`/alerts/${id}`),
+  resolveAlert: (id: string) => api.patch<{ message: string; alert: DegradationAlert }>(`/alerts/${id}/resolve`, {}),
+  getPredictiveAlerts: () => api.get('/alerts/predictive'),
+};
+
+// Soil Health Analytics API
+export const soilHealthAnalyticsAPI = {
+  getTrendsByParcel: (parcelId: string, period?: string) =>
+    api.get(`/soil-health/analytics/trends/${parcelId}${period ? `?period=${period}` : ''}`),
+  getAnalyticsSummary: () => api.get('/soil-health/analytics/summary'),
+  getFertilityIndex: (parcelId: string) => api.get(`/soil-health/analytics/fertility/${parcelId}`),
+};
+
+// Restoration Analytics API
+export const restorationAnalyticsAPI = {
+  getProgressByParcel: (parcelId: string) => api.get(`/restoration/analytics/progress/${parcelId}`),
+  getCarbonOffsetSummary: () => api.get('/restoration/analytics/carbon-offset'),
+};
+
+// Recommendations Analytics API
+export const recommendationsAnalyticsAPI = {
+  getImplementationStats: () => api.get('/recommendations/analytics/implementation'),
+  getAIGeneratedStats: () => api.get('/recommendations/analytics/ai-generated'),
 };
 
 // Users API
@@ -236,5 +287,27 @@ export const usersAPI = {
   getProfile: () => api.get<User>('/users/profile'),
   updateProfile: (data: Partial<User>) => api.put<User>('/users/profile', data),
 };
+
+// Sensors API
+export const sensorsAPI = {
+  registerSensor: (data: Omit<IoTSensor, '_id' | 'parcelId' | 'createdAt' | 'lastSeen'> & { parcelId: string }) =>
+    api.post<{ message: string; sensor: IoTSensor & { apiKey: string } }>('/sensors', data),
+  getSensorsByParcel: (parcelId: string) => api.get<IoTSensor[]>(`/sensors/parcel/${parcelId}`),
+  getAllSensors: () => api.get<IoTSensor[]>('/sensors'),
+  getSensorById: (id: string) => api.get<IoTSensor>(`/sensors/${id}`),
+  updateSensor: (id: string, data: Partial<IoTSensor>) =>
+    api.put<{ message: string; sensor: IoTSensor }>(`/sensors/${id}`, data),
+  deleteSensor: (id: string) => api.delete<{ message: string }>(`/sensors/${id}`),
+};
+
+// Soil Health Ingestion API (for sensor data)
+export const soilHealthIngestionAPI = {
+  ingestSensorData: (data: { sensorId: string; apiKey: string; data: any }) =>
+    api.post('/soil-health/ingest', data),
+};
+
+// Export utilities
+export { exportSoilHealthRecords, exportSensorData } from './csvExport';
+export { exportSensorDataToPDF, exportSoilHealthToPDF } from './pdfExport';
 
 export default api;

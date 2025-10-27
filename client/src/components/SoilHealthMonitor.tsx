@@ -1,15 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Activity, Droplet, Wind, Thermometer } from 'lucide-react';
+import { Activity, Droplet, Wind, Thermometer, CloudRain, Mountain } from 'lucide-react';
 import { soilHealthAPI } from '../lib/api';
 import type { SoilHealthRecord as APISoilHealthRecord } from '../lib/api';
+import { useSocket } from '../contexts/SocketContext';
 
 export default function SoilHealthMonitor() {
   const [records, setRecords] = useState<APISoilHealthRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const { socket } = useSocket();
 
   useEffect(() => {
     loadSoilHealth();
-  }, []);
+
+    // Join parcel room for real-time updates (assuming we have a way to get current parcel)
+    // For now, we'll listen to all sensor updates
+    if (socket) {
+      const handleSensorUpdate = (data: any) => {
+        console.log('Real-time sensor update:', data);
+        // Refresh data when sensor update is received
+        loadSoilHealth();
+      };
+
+      socket.on('sensorUpdate', handleSensorUpdate);
+
+      return () => {
+        socket.off('sensorUpdate', handleSensorUpdate);
+      };
+    }
+  }, [socket]);
 
   const loadSoilHealth = async () => {
     try {
@@ -127,6 +145,26 @@ export default function SoilHealthMonitor() {
                     <div>
                       <p className="text-xs text-gray-500">Organic Matter</p>
                       <p className="text-sm font-semibold text-gray-900">{record.organicMatter}%</p>
+                    </div>
+                  </div>
+                )}
+
+                {record.rainfall !== null && (
+                  <div className="flex items-center gap-2">
+                    <CloudRain className="w-5 h-5 text-blue-500" />
+                    <div>
+                      <p className="text-xs text-gray-500">Rainfall</p>
+                      <p className="text-sm font-semibold text-gray-900">{record.rainfall} mm</p>
+                    </div>
+                  </div>
+                )}
+
+                {record.erosionRate !== null && (
+                  <div className="flex items-center gap-2">
+                    <Mountain className="w-5 h-5 text-red-500" />
+                    <div>
+                      <p className="text-xs text-gray-500">Erosion Rate</p>
+                      <p className="text-sm font-semibold text-gray-900">{record.erosionRate} tons/ha</p>
                     </div>
                   </div>
                 )}

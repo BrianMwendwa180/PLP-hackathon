@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sprout, BarChart3, Map, TreePine, Lightbulb, Award, Users, LogOut } from 'lucide-react';
+import { Sprout, BarChart3, Map, TreePine, Lightbulb, Award, Users, LogOut, Shield, Cpu } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import SoilHealthMonitor from './components/SoilHealthMonitor';
@@ -7,6 +7,8 @@ import LandMap from './components/LandMap';
 import RestorationTracker from './components/RestorationTracker';
 import Recommendations from './components/Recommendations';
 import ImpactMetrics from './components/ImpactMetrics';
+import Resilience from './components/Resilience';
+import IoTSensorDashboard from './components/IoTSensorDashboard';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
 
@@ -25,10 +27,12 @@ export default function App() {
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, component: Dashboard },
     { id: 'soil-health', label: 'Soil Health', icon: Sprout, component: SoilHealthMonitor },
+    { id: 'iot-sensors', label: 'IoT Sensors', icon: Cpu, component: IoTSensorDashboard },
     { id: 'map', label: 'Land Map', icon: Map, component: LandMap },
     { id: 'restoration', label: 'Restoration', icon: TreePine, component: RestorationTracker },
     { id: 'recommendations', label: 'Recommendations', icon: Lightbulb, component: Recommendations },
     { id: 'impact', label: 'Impact Metrics', icon: Award, component: ImpactMetrics },
+    { id: 'resilience', label: 'Resilience', icon: Shield, component: Resilience },
   ];
 
   const ActiveComponent = navItems.find((item) => item.id === activeTab)?.component || Dashboard;

@@ -2,7 +2,7 @@ import LandParcel from '../models/LandParcel.js';
 
 export const createLandParcel = async (req, res) => {
   try {
-    const { name, location, latitude, longitude, sizeHectares, landUseType } = req.body;
+    const { name, location, latitude, longitude, sizeHectares, landUseType, soilType, vegetationType, irrigationType, climateZone } = req.body;
 
     const landParcel = new LandParcel({
       name,
@@ -11,7 +11,11 @@ export const createLandParcel = async (req, res) => {
       longitude,
       sizeHectares,
       ownerId: req.user.userId,
-      landUseType
+      landUseType,
+      soilType,
+      vegetationType,
+      irrigationType,
+      climateZone
     });
 
     await landParcel.save();
@@ -60,11 +64,11 @@ export const getLandParcelById = async (req, res) => {
 
 export const updateLandParcel = async (req, res) => {
   try {
-    const { name, location, latitude, longitude, sizeHectares, landUseType } = req.body;
+    const { name, location, latitude, longitude, sizeHectares, landUseType, soilType, vegetationType, irrigationType, climateZone } = req.body;
 
     const landParcel = await LandParcel.findByIdAndUpdate(
       req.params.id,
-      { name, location, latitude, longitude, sizeHectares, landUseType },
+      { name, location, latitude, longitude, sizeHectares, landUseType, soilType, vegetationType, irrigationType, climateZone },
       { new: true, runValidators: true }
     ).populate('ownerId', 'fullName email');
 

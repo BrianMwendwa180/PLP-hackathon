@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { MapPin, AlertCircle, CheckCircle } from 'lucide-react';
+import { MapPin, AlertCircle, CheckCircle, Plus } from 'lucide-react';
 import { landParcelsAPI, alertsAPI } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { LandParcel as APILandParcel, DegradationAlert as APIDegradationAlert } from '../lib/api';
+import ParcelModal from './ParcelModal';
 
 type ParcelWithAlerts = APILandParcel & {
   alerts: APIDegradationAlert[];
@@ -12,6 +13,8 @@ export default function LandMap() {
   const { user } = useAuth();
   const [parcels, setParcels] = useState<ParcelWithAlerts[]>([]);
   const [selectedParcel, setSelectedParcel] = useState<ParcelWithAlerts | null>(null);
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -75,13 +78,39 @@ export default function LandMap() {
     }
   };
 
+  const handleCloseModal = () => {
+    setSelectedParcel(null);
+    setModalMode('view');
+    setIsModalOpen(false);
+  };
+
+  const handleSaveParcel = (updatedParcel: APILandParcel) => {
+    loadMapData();
+    handleCloseModal();
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg p-8 text-white">
-        <h2 className="text-2xl font-bold mb-2">Land Degradation Map & Alerts</h2>
-        <p className="text-blue-50">
-          Real-time monitoring of land health and degradation risks
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-2">Land Degradation Map & Alerts</h2>
+            <p className="text-blue-50">
+              Real-time monitoring of land health and degradation risks
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedParcel(null);
+              setModalMode('create');
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add New Parcel
+          </button>
+        </div>
       </div>
 
       {parcels.length === 0 ? (
@@ -216,6 +245,23 @@ export default function LandMap() {
           </div>
         </div>
       )}
+
+      <ParcelModal
+        parcel={selectedParcel}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setSelectedParcel(null);
+          setModalMode('view');
+          setIsModalOpen(false);
+        }}
+        onSave={(updatedParcel) => {
+          loadMapData();
+          setSelectedParcel(null);
+          setModalMode('view');
+          setIsModalOpen(false);
+        }}
+        mode={modalMode}
+      />
     </div>
   );
 }

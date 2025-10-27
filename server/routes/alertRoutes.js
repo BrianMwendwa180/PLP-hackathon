@@ -5,9 +5,11 @@ import {
   getAllAlerts,
   getAlertById,
   updateAlert,
-  deleteAlert
+  deleteAlert,
+  generateClimateAlerts
 } from '../controllers/alertController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
+import DegradationAlert from '../models/DegradationAlert.js';
 
 const router = express.Router();
 
@@ -40,5 +42,45 @@ router.put('/:id', authenticateToken, updateAlert);
 // @desc    Delete alert
 // @access  Private
 router.delete('/:id', authenticateToken, deleteAlert);
+
+// @route   POST /api/alerts/parcel/:parcelId/generate
+// @desc    Generate climate resilience alerts for a parcel
+// @access  Private
+router.post('/parcel/:parcelId/generate', authenticateToken, generateClimateAlerts);
+
+// @route   PATCH /api/alerts/:id/resolve
+// @desc    Resolve an alert
+// @access  Private
+router.patch('/:id/resolve', authenticateToken, async (req, res) => {
+  try {
+    const alert = await DegradationAlert.findByIdAndUpdate(
+      req.params.id,
+      { isResolved: true, resolvedAt: new Date() },
+      { new: true }
+    );
+    if (!alert) {
+      return res.status(404).json({ message: 'Alert not found' });
+    }
+    res.json({ message: 'Alert resolved successfully', alert });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// @route   GET /api/alerts/predictive
+// @desc    Get predictive alerts based on trends
+// @access  Private
+router.get('/predictive', authenticateToken, async (req, res) => {
+  try {
+    // This would implement predictive logic based on soil trends
+    // For now, return active alerts as predictive
+    const alerts = await DegradationAlert.find({ isResolved: false })
+      .populate('parcelId', 'name location')
+      .sort({ createdAt: -1 });
+    res.json(alerts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 export default router;

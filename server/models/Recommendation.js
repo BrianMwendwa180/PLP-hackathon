@@ -13,7 +13,7 @@ const recommendationSchema = new mongoose.Schema({
   },
   recommendationType: {
     type: String,
-    enum: ['soil_amendment', 'crop_rotation', 'water_management', 'erosion_control', 'reforestation', 'other'],
+    enum: ['soil_amendment', 'crop_rotation', 'water_management', 'erosion_control', 'reforestation', 'fertilization', 'liming', 'drainage', 'irrigation', 'cover_cropping', 'organic_matter_addition', 'climate_adaptation', 'other'],
     required: true
   },
   title: {

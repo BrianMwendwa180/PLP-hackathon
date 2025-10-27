@@ -18,6 +18,8 @@ const soilHealthRecordSchema = new mongoose.Schema({
   potassiumLevel: Number,
   organicMatter: Number,
   temperature: Number,
+  rainfall: Number, // in mm
+  erosionRate: Number, // in tons/ha/year
   dataSource: {
     type: String,
     enum: ['iot_sensor', 'satellite', 'manual', 'ai_prediction'],

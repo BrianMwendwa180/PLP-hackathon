@@ -5,7 +5,8 @@ import {
   getAllRestorationActivities,
   getRestorationActivityById,
   updateRestorationActivity,
-  deleteRestorationActivity
+  deleteRestorationActivity,
+  getRestorationProgress
 } from '../controllers/restorationController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -40,5 +41,10 @@ router.put('/:id', authenticateToken, updateRestorationActivity);
 // @desc    Delete restoration activity
 // @access  Private
 router.delete('/:id', authenticateToken, deleteRestorationActivity);
+
+// @route   GET /api/restoration/parcel/:parcelId/progress
+// @desc    Get restoration progress for a parcel
+// @access  Private
+router.get('/parcel/:parcelId/progress', authenticateToken, getRestorationProgress);
 
 export default router;

@@ -132,3 +132,77 @@ export const deleteRestorationActivity = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+export const getRestorationProgress = async (req, res) => {
+  try {
+    const { parcelId } = req.params;
+
+    // Verify the land parcel exists and belongs to the user
+    const landParcel = await LandParcel.findById(parcelId);
+    if (!landParcel) {
+      return res.status(404).json({ message: 'Land parcel not found' });
+    }
+
+    if (landParcel.ownerId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized to view progress for this parcel' });
+    }
+
+    // Get all restoration activities for the parcel
+    const activities = await RestorationActivity.find({ parcelId })
+      .sort({ performedAt: 1 });
+
+    // Get soil health records to track improvement
+    const soilRecords = await require('../models/SoilHealthRecord.js').find({ parcelId })
+      .sort({ recordedAt: 1 })
+      .select('vitalityScore recordedAt');
+
+    // Calculate progress metrics
+    const totalActivities = activities.length;
+    const verifiedActivities = activities.filter(a => a.verificationStatus === 'verified').length;
+    const totalCarbonOffset = activities.reduce((sum, a) => sum + a.carbonOffsetKg, 0);
+
+    // Calculate soil improvement over time
+    let soilImprovement = 0;
+    if (soilRecords.length >= 2) {
+      const firstScore = soilRecords[0].vitalityScore;
+      const lastScore = soilRecords[soilRecords.length - 1].vitalityScore;
+      if (firstScore && lastScore) {
+        soilImprovement = lastScore - firstScore;
+      }
+    }
+
+    // Group activities by type for progress tracking
+    const activityTypes = {};
+    activities.forEach(activity => {
+      if (!activityTypes[activity.activityType]) {
+        activityTypes[activity.activityType] = {
+          count: 0,
+          totalQuantity: 0,
+          unit: activity.unit,
+          carbonOffset: 0
+        };
+      }
+      activityTypes[activity.activityType].count++;
+      activityTypes[activity.activityType].totalQuantity += activity.quantity;
+      activityTypes[activity.activityType].carbonOffset += activity.carbonOffsetKg;
+    });
+
+    // Calculate rehabilitation percentage (simplified metric)
+    const rehabilitationProgress = Math.min(totalActivities * 5, 100); // 20 activities = 100%
+
+    const progress = {
+      totalActivities,
+      verifiedActivities,
+      totalCarbonOffset,
+      soilImprovement,
+      rehabilitationProgress,
+      activityTypes,
+      soilRecords: soilRecords.slice(-5), // Last 5 records for trend
+      activities: activities.slice(-10) // Last 10 activities
+    };
+
+    res.json(progress);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

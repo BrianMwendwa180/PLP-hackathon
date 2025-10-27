@@ -5,7 +5,8 @@ import {
   getAllRecommendations,
   getRecommendationById,
   updateRecommendation,
-  deleteRecommendation
+  deleteRecommendation,
+  generateAgricultureRecommendations
 } from '../controllers/recommendationController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -40,5 +41,10 @@ router.put('/:id', authenticateToken, updateRecommendation);
 // @desc    Delete recommendation
 // @access  Private
 router.delete('/:id', authenticateToken, deleteRecommendation);
+
+// @route   POST /api/recommendations/parcel/:parcelId/agriculture
+// @desc    Generate agriculture recommendations for a parcel
+// @access  Private
+router.post('/parcel/:parcelId/agriculture', authenticateToken, generateAgricultureRecommendations);
 
 export default router;

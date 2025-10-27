@@ -28,8 +28,28 @@ const landParcelSchema = new mongoose.Schema({
   },
   landUseType: {
     type: String,
-    enum: ['agriculture', 'forest', 'pasture', 'urban', 'other'],
+    enum: ['agriculture', 'forest', 'pasture', 'urban', 'other', 'grassland', 'wetland'],
     default: 'agriculture'
+  },
+  soilType: {
+    type: String,
+    enum: ['sandy', 'clay', 'loam', 'silt', 'peat', 'chalk', 'other'],
+    required: false
+  },
+  vegetationType: {
+    type: String,
+    enum: ['grassland', 'forest', 'cropland', 'shrubland', 'wetland', 'barren', 'other'],
+    required: false
+  },
+  irrigationType: {
+    type: String,
+    enum: ['rainfed', 'irrigated', 'drip', 'sprinkler', 'flood', 'none'],
+    required: false
+  },
+  climateZone: {
+    type: String,
+    enum: ['tropical', 'subtropical', 'temperate', 'continental', 'polar', 'arid', 'semiarid', 'other'],
+    required: false
   }
 }, {
   timestamps: true
