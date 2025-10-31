@@ -6,7 +6,8 @@ import {
   getRecommendationById,
   updateRecommendation,
   deleteRecommendation,
-  generateAgricultureRecommendations
+  generateAgricultureRecommendations,
+  chatWithRestorationAI
 } from '../controllers/recommendationController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -46,5 +47,10 @@ router.delete('/:id', authenticateToken, deleteRecommendation);
 // @desc    Generate agriculture recommendations for a parcel
 // @access  Private
 router.post('/parcel/:parcelId/agriculture', authenticateToken, generateAgricultureRecommendations);
+
+// @route   POST /api/recommendations/parcel/:parcelId/chat
+// @desc    Chat with AI about restoration practices
+// @access  Private
+router.post('/parcel/:parcelId/chat', authenticateToken, chatWithRestorationAI);
 
 export default router;

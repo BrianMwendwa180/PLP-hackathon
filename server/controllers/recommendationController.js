@@ -1,5 +1,13 @@
 import Recommendation from '../models/Recommendation.js';
 import LandParcel from '../models/LandParcel.js';
+import { enhancedAIService } from '../services/enhancedAIService.js';
+import {
+  generateDegradationPredictions,
+  generateCropRecommendations,
+  generateRestorationSuggestions,
+  generateFertilizerOptimizations,
+  generateWaterManagement
+} from '../services/openaiService.js';
 
 export const createRecommendation = async (req, res) => {
   try {
@@ -149,35 +157,54 @@ export const generateAgricultureRecommendations = async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized to generate recommendations for this parcel' });
     }
 
-    // Get latest soil health record
-    const latestRecord = await require('../models/SoilHealthRecord.js').findOne({ parcelId })
-      .sort({ recordedAt: -1 });
+    // Use enhanced AI service for comprehensive recommendations
+    const result = await enhancedAIService.generateComprehensiveRecommendations(parcelId, req.user.userId);
 
-    if (!latestRecord) {
-      return res.json({ recommendations: [] });
-    }
-
-    // Generate agriculture-specific recommendations based on soil data
-    const recommendations = generateAgricultureRecommendationsFromSoil(latestRecord, parcelId, req.user.userId);
-
-    // Save generated recommendations
-    const savedRecommendations = [];
-    for (const rec of recommendations) {
-      const recommendation = new Recommendation({
-        parcelId,
-        userId: req.user.userId,
-        ...rec,
-        aiGenerated: true
-      });
-      await recommendation.save();
-      savedRecommendations.push(recommendation);
-    }
-
-    res.json({ message: 'Agriculture recommendations generated successfully', recommendations: savedRecommendations });
+    res.json(result);
   } catch (error) {
+    console.error('Enhanced AI recommendation generation error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Chat with AI about restoration practices
+export const chatWithRestorationAI = async (req, res) => {
+  try {
+    const { parcelId } = req.params;
+    const { query, conversationHistory = [] } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ message: 'Query is required' });
+    }
+
+    // Verify the land parcel exists and belongs to the user
+    const landParcel = await LandParcel.findById(parcelId);
+    if (!landParcel) {
+      return res.status(404).json({ message: 'Land parcel not found' });
+    }
+
+    if (landParcel.ownerId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized to chat about this parcel' });
+    }
+
+    // Use enhanced AI service for chat
+    const result = await enhancedAIService.chatAboutRestoration(query, parcelId, req.user.userId, conversationHistory);
+
+    res.json({
+      message: 'AI response generated successfully',
+      ...result
+    });
+  } catch (error) {
+    console.error('AI chat error:', error);
+    res.status(500).json({
+      message: 'Server error',
+      error: error.message,
+      response: "I'm sorry, I'm having trouble processing your question right now. Could you please try rephrasing your question or provide more details about your specific situation? If the problem persists, our team can assist you directly."
+    });
+  }
+};
+
+// Legacy rule-based functions kept as fallback (now handled by OpenAI service)
 
 // Helper function to generate agriculture recommendations
 function generateAgricultureRecommendationsFromSoil(soilRecord, parcelId, userId) {

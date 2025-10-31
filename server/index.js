@@ -15,6 +15,8 @@ import sensorRoutes from "./routes/sensorRoutes.js";
 import restorationRoutes from "./routes/restorationRoutes.js";
 import recommendationRoutes from "./routes/recommendationRoutes.js";
 import alertRoutes from "./routes/alertRoutes.js";
+import imageAnalysisRoutes from "./routes/imageAnalysisRoutes.js";
+import backgroundProcessingRoutes from "./routes/backgroundProcessingRoutes.js";
 
 // Load environment variables
 dotenv.config();
@@ -49,6 +51,8 @@ app.use("/api/sensors", sensorRoutes);
 app.use("/api/restoration", restorationRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/alerts", alertRoutes);
+app.use("/api/image-analysis", imageAnalysisRoutes);
+app.use("/api/background-processing", backgroundProcessingRoutes);
 
 // Health check route
 app.get("/api/health", (req, res) => {

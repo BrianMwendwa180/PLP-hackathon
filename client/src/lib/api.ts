@@ -132,6 +132,8 @@ export interface Recommendation {
   aiGenerated?: boolean;
   status: string;
   aiConfidence?: number;
+  predictionTimeframe?: string;
+  predictionType?: string;
   createdAt: string;
   implementedAt?: string;
 }

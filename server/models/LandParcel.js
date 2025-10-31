@@ -50,6 +50,44 @@ const landParcelSchema = new mongoose.Schema({
     type: String,
     enum: ['tropical', 'subtropical', 'temperate', 'continental', 'polar', 'arid', 'semiarid', 'other'],
     required: false
+  },
+  // Enhanced AI and sustainability fields
+  sustainabilityScore: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null
+  },
+  sustainabilityGrade: {
+    type: String,
+    enum: ['A', 'B', 'C', 'D', 'F'],
+    default: null
+  },
+  lastSustainabilityUpdate: {
+    type: Date,
+    default: null
+  },
+  aiAnalysisEnabled: {
+    type: Boolean,
+    default: true
+  },
+  lastAIAnalysis: {
+    type: Date,
+    default: null
+  },
+  weatherStationId: {
+    type: String,
+    default: null
+  },
+  carbonFootprint: {
+    type: Number,
+    default: null
+  },
+  biodiversityIndex: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: null
   }
 }, {
   timestamps: true
