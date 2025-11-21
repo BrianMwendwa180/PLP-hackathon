@@ -40,7 +40,22 @@ const restorationActivitySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  verifiedAt: Date
+  verifiedAt: Date,
+  accessedModule: {
+    type: String,
+    enum: [
+      'Dashboard',
+      'RestorationTracker',
+      'SoilHealthMonitor',
+      'Recommendations',
+      'ImpactMetrics',
+      'IoTSensorDashboard',
+      'LandMap',
+      'Resilience',
+      'LandingPage',
+      'AuthModal'
+    ]
+  }
 }, {
   timestamps: true
 });

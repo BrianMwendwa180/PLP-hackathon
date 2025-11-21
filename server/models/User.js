@@ -31,6 +31,11 @@ const userSchema = new mongoose.Schema({
   badges: {
     type: [String],
     default: []
+  },
+  aiPreferences: {
+    type: Map,
+    of: Number,
+    default: {}
   }
 }, {
   timestamps: true

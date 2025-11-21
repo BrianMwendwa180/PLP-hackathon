@@ -1,6 +1,8 @@
 import Recommendation from '../models/Recommendation.js';
 import LandParcel from '../models/LandParcel.js';
+import User from '../models/User.js';
 import { enhancedAIService } from '../services/enhancedAIService.js';
+import { getAllTemperatures, applyUserPreferences, validateTemperature, TASK_TYPES } from '../config/temperatureConfig.js';
 import {
   generateDegradationPredictions,
   generateCropRecommendations,
@@ -163,7 +165,117 @@ export const generateAgricultureRecommendations = async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Enhanced AI recommendation generation error:', error);
+    // Provide more informative error message instead of generic fallback
+    const errorMessage = error.message.includes('JSON') ?
+      'AI service temporarily unavailable. Using basic recommendations.' :
+      'Unable to generate AI recommendations at this time. Please try again later.';
+    res.status(500).json({
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      recommendations: [] // Return empty array instead of crashing
+    });
+  }
+};
+
+// Get temperature settings for the current user
+export const getTemperatures = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await User.findById(userId).select('aiPreferences');
+
+    const defaultTemps = getAllTemperatures('openai');
+    const userTemps = applyUserPreferences(defaultTemps, user?.aiPreferences || null, 'openai');
+
+    res.json({
+      message: 'Temperature settings retrieved successfully',
+      temperatures: userTemps,
+      defaults: defaultTemps,
+      userOverrides: user?.aiPreferences || {}
+    });
+  } catch (error) {
+    console.error('Error retrieving temperatures:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update temperature setting for a specific task type
+export const updateTemperature = async (req, res) => {
+  try {
+    const { taskType, temperature } = req.body;
+    const userId = req.user.userId;
+
+    if (!taskType || !Object.values(TASK_TYPES).includes(taskType)) {
+      return res.status(400).json({ message: 'Invalid task type' });
+    }
+
+    if (!validateTemperature(temperature, 'openai')) {
+      return res.status(400).json({ message: 'Invalid temperature value. Must be between 0.0 and 2.0' });
+    }
+
+    // Update user's aiPreferences
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { [`aiPreferences.${taskType}`]: temperature },
+      { new: true, upsert: true }
+    ).select('aiPreferences');
+
+    // Clear user preferences cache in enhancedAIService
+    if (enhancedAIService.userPrefsCache) {
+      enhancedAIService.userPrefsCache.del(`user_prefs_${userId}`);
+    }
+
+    res.json({
+      message: 'Temperature setting updated successfully',
+      taskType,
+      temperature,
+      aiPreferences: user.aiPreferences
+    });
+  } catch (error) {
+    console.error('Error updating temperature:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Get Google Earth Engine data for a parcel
+export const getEarthEngineData = async (req, res) => {
+  try {
+    const { parcelId } = req.params;
+
+    // Verify the land parcel exists and belongs to the user
+    const landParcel = await LandParcel.findById(parcelId);
+    if (!landParcel) {
+      return res.status(404).json({ message: 'Land parcel not found' });
+    }
+
+    if (landParcel.ownerId.toString() !== req.user.userId) {
+      return res.status(403).json({ message: 'Unauthorized to access this parcel' });
+    }
+
+    // Check if parcel has coordinates for GEE analysis
+    if (!landParcel.latitude || !landParcel.longitude) {
+      return res.status(400).json({
+        message: 'Parcel coordinates required for satellite data analysis',
+        earthEngineData: null
+      });
+    }
+
+    // Get Earth Engine analysis
+    const { googleEarthEngineService } = await import('../services/googleEarthEngineService.js');
+    const earthEngineData = await googleEarthEngineService.analyzeParcel(landParcel);
+
+    res.json({
+      message: 'Earth Engine data retrieved successfully',
+      earthEngineData,
+      parcelId
+    });
+  } catch (error) {
+    console.error('Earth Engine data retrieval error:', error);
+    res.status(500).json({
+      message: 'Unable to retrieve satellite data at this time',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable',
+      earthEngineData: null,
+      parcelId: req.params.parcelId
+    });
   }
 };
 
@@ -196,10 +308,16 @@ export const chatWithRestorationAI = async (req, res) => {
     });
   } catch (error) {
     console.error('AI chat error:', error);
+    // Provide contextual error response instead of generic message
+    const contextualError = error.message.includes('JSON') || error.message.includes('parse') ?
+      "I'm experiencing some technical difficulties with my response system right now. Could you try asking your question again in a moment?" :
+      "I'm having trouble connecting to my knowledge base at the moment. Please try your question again, or feel free to ask about soil health basics while I work on this.";
     res.status(500).json({
-      message: 'Server error',
-      error: error.message,
-      response: "I'm sorry, I'm having trouble processing your question right now. Could you please try rephrasing your question or provide more details about your specific situation? If the problem persists, our team can assist you directly."
+      message: 'AI chat temporarily unavailable',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Service temporarily unavailable',
+      response: contextualError,
+      parcelId: req.params.parcelId,
+      userId: req.user.userId
     });
   }
 };

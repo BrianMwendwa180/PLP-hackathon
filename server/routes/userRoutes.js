@@ -2,6 +2,8 @@ import express from 'express';
 import {
   getUserProfile,
   updateUserProfile,
+  trackModuleInteraction,
+  getUserModulePreferences,
   getAllUsers,
   getUserById,
   deleteUser
@@ -19,6 +21,16 @@ router.get('/profile', authenticateToken, getUserProfile);
 // @desc    Update current user profile
 // @access  Private
 router.put('/profile', authenticateToken, updateUserProfile);
+
+// @route   POST /api/users/module-interaction
+// @desc    Track user module interaction
+// @access  Private
+router.post('/module-interaction', authenticateToken, trackModuleInteraction);
+
+// @route   GET /api/users/module-preferences
+// @desc    Get user module preferences
+// @access  Private
+router.get('/module-preferences', authenticateToken, getUserModulePreferences);
 
 // @route   GET /api/users
 // @desc    Get all users

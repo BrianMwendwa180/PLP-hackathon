@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sprout, BarChart3, Map, TreePine, Lightbulb, Award, Users, LogOut, Shield, Cpu } from 'lucide-react';
+import { Sprout, BarChart3, Map, TreePine, Lightbulb, Award, Users, LogOut, Shield, Cpu, Menu, X } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import SoilHealthMonitor from './components/SoilHealthMonitor';
@@ -22,6 +22,7 @@ type NavItem = {
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
 
   const navItems: NavItem[] = [
@@ -53,56 +54,120 @@ export default function App() {
                 <p className="text-xs text-gray-500">Smart Land Health Intelligence</p>
               </div>
             </div>
-            <div className="flex items-center gap-8">
-              {!user && (
-                <>
+            <div className="flex items-center gap-4 md:gap-8">
+              {/* Desktop Navigation */}
+              <div className="hidden md:flex items-center gap-8">
+                {!user && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const element = document.getElementById('home');
+                        if (element) element.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="text-gray-600 hover:text-emerald-600 transition-colors font-medium"
+                    >
+                      Home
+                    </button>
+                    <button
+                      onClick={() => {
+                        const element = document.getElementById('about');
+                        if (element) element.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="text-gray-600 hover:text-emerald-600 transition-colors font-medium"
+                    >
+                      About
+                    </button>
+                  </>
+                )}
+                {user ? (
                   <button
-                    onClick={() => {
-                      const element = document.getElementById('home');
-                      if (element) element.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="text-gray-600 hover:text-emerald-600 transition-colors font-medium"
+                    onClick={logout}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-sm font-medium text-sm"
                   >
-                    Home
+                    <LogOut className="w-4 h-4" />
+                    Logout
                   </button>
+                ) : (
                   <button
-                    onClick={() => {
-                      const element = document.getElementById('about');
-                      if (element) element.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="text-gray-600 hover:text-emerald-600 transition-colors font-medium"
+                    onClick={() => setIsAuthModalOpen(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm font-medium text-sm"
                   >
-                    About
+                    <Users className="w-4 h-4" />
+                    Collaborate
                   </button>
-                </>
-              )}
-              {user ? (
-                <button
-                  onClick={logout}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all shadow-sm font-medium text-sm"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              ) : (
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all shadow-sm font-medium text-sm"
-                >
-                  <Users className="w-4 h-4" />
-                  Collaborate
-                </button>
-              )}
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2 text-gray-600 hover:text-emerald-600 transition-colors"
+              >
+                {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
             </div>
           </div>
         </div>
       </header>
 
+      {/* Mobile Menu Dropdown */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden absolute top-16 right-4 bg-white shadow-lg rounded-lg border border-gray-200 py-1 z-50 min-w-[150px]">
+          {!user && (
+            <>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  const element = document.getElementById('home');
+                  if (element) element.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  const element = document.getElementById('about');
+                  if (element) element.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                About
+              </button>
+            </>
+          )}
+          {user ? (
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                logout();
+              }}
+              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setIsAuthModalOpen(true);
+              }}
+              className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <Users className="w-4 h-4" />
+              Collaborate
+            </button>
+          )}
+        </div>
+      )}
+
       {user && (
         <>
           <nav className="bg-white border-b border-gray-200 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex gap-1 overflow-x-auto scrollbar-hide py-2">
+              <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 overflow-x-auto sm:overflow-visible py-2 sm:py-2">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;

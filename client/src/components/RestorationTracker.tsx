@@ -4,6 +4,7 @@ import { restorationAPI } from '../lib/api';
 import type { RestorationActivity as APIRestorationActivity } from '../lib/api';
 import { exportToCSV } from '../lib/csvExport';
 import { aiRecommendationsAPI } from '../lib/enhancedApi';
+import { moduleInteractionAPI } from '../lib/enhancedApi';
 
 export default function RestorationTracker() {
   const [activities, setActivities] = useState<APIRestorationActivity[]>([]);
@@ -17,6 +18,8 @@ export default function RestorationTracker() {
 
   useEffect(() => {
     loadRestorationActivities();
+    // Track module access
+    moduleInteractionAPI.trackModuleAccess('RestorationTracker').catch(console.error);
   }, []);
 
   const loadRestorationActivities = async () => {
@@ -164,9 +167,11 @@ export default function RestorationTracker() {
 
     } catch (error) {
       console.error('Chat error:', error);
+      // Let the backend handle error response generation
+      const errorResponse = (error as any)?.response?.data?.response || 'Sorry, I encountered an error while processing your question. Please try again.';
       setChatMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Sorry, I encountered an error while processing your question. Please try again.',
+        content: errorResponse,
         timestamp: new Date()
       }]);
     } finally {

@@ -1,11 +1,87 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { getTemperature, TASK_TYPES } from '../config/temperatureConfig.js';
 
 dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Schema validation functions
+const validateDegradationPredictions = (data) => {
+  if (!Array.isArray(data)) return false;
+  return data.every(item =>
+    item.title && item.description && item.priority &&
+    ['low', 'medium', 'high', 'critical'].includes(item.priority) &&
+    typeof item.estimatedCost === 'number' &&
+    typeof item.estimatedTimeDays === 'number' &&
+    typeof item.aiConfidence === 'number'
+  );
+};
+
+const validateRecommendations = (data) => {
+  if (!Array.isArray(data)) return false;
+  return data.every(item =>
+    item.title && item.description && item.priority &&
+    ['low', 'medium', 'high', 'critical'].includes(item.priority) &&
+    typeof item.estimatedCost === 'number' &&
+    typeof item.estimatedTimeDays === 'number' &&
+    typeof item.aiConfidence === 'number'
+  );
+};
+
+// Response sanitization: Extract JSON from potentially malformed responses
+const sanitizeAndParseJSON = (content) => {
+  try {
+    // First try direct parsing
+    return JSON.parse(content);
+  } catch {
+    // Try to extract JSON from markdown code blocks or text
+    const jsonMatch = content.match(/```(?:json)?\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```/) ||
+                      content.match(/(\[[\s\S]*?\]|\{[\s\S]*?\})/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[1]);
+      } catch {
+        // If still fails, try to fix common issues
+        let fixed = jsonMatch[1]
+          .replace(/,\s*}/g, '}')  // Remove trailing commas
+          .replace(/,\s*]/g, ']')
+          .replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":'); // Quote unquoted keys
+        return JSON.parse(fixed);
+      }
+    }
+    throw new Error('Unable to parse JSON from response');
+  }
+};
+
+// Retry logic with improved prompts
+const callOpenAIWithRetry = async (messages, options, retryCount = 0) => {
+  const maxRetries = 2;
+  try {
+    const response = await openai.chat.completions.create({
+      ...options,
+      messages,
+      response_format: { type: "json_object" } // Enable JSON Mode
+    });
+    const content = response.choices[0].message.content;
+    return sanitizeAndParseJSON(content);
+  } catch (error) {
+    if (retryCount < maxRetries) {
+      console.warn(`OpenAI call failed, retrying (${retryCount + 1}/${maxRetries}):`, error.message);
+      // Improve prompt for retry
+      const improvedMessages = messages.map(msg =>
+        msg.role === 'user' ? {
+          ...msg,
+          content: msg.content + '\n\nIMPORTANT: Respond ONLY with valid JSON. No additional text, explanations, or formatting.'
+        } : msg
+      );
+      return callOpenAIWithRetry(improvedMessages, options, retryCount + 1);
+    }
+    throw error;
+  }
+};
 
 export const generateDegradationPredictions = async (soilRecord, sensorData) => {
   try {
@@ -56,15 +132,20 @@ For each prediction, provide:
 
 Respond ONLY with valid JSON array. No additional text or explanations.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 1000,
-    });
+    const predictions = await callOpenAIWithRetry(
+      [{ role: 'user', content: prompt }],
+      {
+        model: 'gpt-4',
+        temperature: getTemperature(TASK_TYPES.PREDICTION),
+        max_tokens: 1000,
+      }
+    );
 
-    const content = response.choices[0].message.content;
-    const predictions = JSON.parse(content);
+    // Validate the response structure
+    if (!validateDegradationPredictions(predictions)) {
+      console.warn('Invalid degradation predictions structure, using fallback');
+      return fallbackDegradationPredictions(soilRecord, sensorData);
+    }
 
     return predictions.map(pred => ({
       recommendationType: pred.recommendationType || 'erosion_control',
@@ -113,15 +194,20 @@ Include confidence level, estimated costs, and implementation timeline.
 
 Respond in JSON format with an array of recommendation objects.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.4,
-      max_tokens: 800,
-    });
+    const recommendations = await callOpenAIWithRetry(
+      [{ role: 'user', content: prompt }],
+      {
+        model: 'gpt-4',
+        temperature: getTemperature(TASK_TYPES.RECOMMENDATION),
+        max_tokens: 800,
+      }
+    );
 
-    const content = response.choices[0].message.content;
-    const recommendations = JSON.parse(content);
+    // Validate the response structure
+    if (!validateRecommendations(recommendations)) {
+      console.warn('Invalid crop recommendations structure, using fallback');
+      return fallbackCropRecommendations(soilRecord, landParcel);
+    }
 
     return recommendations.map(rec => ({
       recommendationType: 'crop_rotation',
@@ -163,15 +249,20 @@ Consider the severity of degradation and provide practical, cost-effective solut
 
 Respond in JSON format with an array of recommendation objects.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
-    });
+    const suggestions = await callOpenAIWithRetry(
+      [{ role: 'user', content: prompt }],
+      {
+        model: 'gpt-4',
+        temperature: getTemperature(TASK_TYPES.RECOMMENDATION),
+        max_tokens: 800,
+      }
+    );
 
-    const content = response.choices[0].message.content;
-    const suggestions = JSON.parse(content);
+    // Validate the response structure
+    if (!validateRecommendations(suggestions)) {
+      console.warn('Invalid restoration suggestions structure, using fallback');
+      return fallbackRestorationSuggestions(soilRecord, sensorData);
+    }
 
     return suggestions.map(sugg => ({
       recommendationType: sugg.recommendationType || 'erosion_control',
@@ -211,15 +302,20 @@ Consider environmental impact and sustainable practices.
 
 Respond in JSON format with an array of recommendation objects.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.2,
-      max_tokens: 800,
-    });
+    const optimizations = await callOpenAIWithRetry(
+      [{ role: 'user', content: prompt }],
+      {
+        model: 'gpt-4',
+        temperature: getTemperature(TASK_TYPES.ANALYTICAL),
+        max_tokens: 800,
+      }
+    );
 
-    const content = response.choices[0].message.content;
-    const optimizations = JSON.parse(content);
+    // Validate the response structure
+    if (!validateRecommendations(optimizations)) {
+      console.warn('Invalid fertilizer optimizations structure, using fallback');
+      return fallbackFertilizerOptimizations(soilRecord);
+    }
 
     return optimizations.map(opt => ({
       recommendationType: 'fertilization',
@@ -259,15 +355,20 @@ Include specific actions, timing, and expected outcomes.
 
 Respond in JSON format with an array of recommendation objects.`;
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
-    });
+    const recommendations = await callOpenAIWithRetry(
+      [{ role: 'user', content: prompt }],
+      {
+        model: 'gpt-4',
+        temperature: getTemperature(TASK_TYPES.RECOMMENDATION),
+        max_tokens: 800,
+      }
+    );
 
-    const content = response.choices[0].message.content;
-    const recommendations = JSON.parse(content);
+    // Validate the response structure
+    if (!validateRecommendations(recommendations)) {
+      console.warn('Invalid water management recommendations structure, using fallback');
+      return fallbackWaterManagement(soilRecord, sensorData);
+    }
 
     return recommendations.map(rec => ({
       recommendationType: rec.recommendationType || 'irrigation',

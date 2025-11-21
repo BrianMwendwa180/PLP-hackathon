@@ -4,6 +4,7 @@ import { soilHealthAPI } from '../lib/api';
 import type { SoilHealthRecord as APISoilHealthRecord } from '../lib/api';
 import { useSocket } from '../contexts/SocketContext';
 import { exportToCSV } from '../lib/csvExport';
+import { moduleInteractionAPI } from '../lib/enhancedApi';
 
 export default function SoilHealthMonitor() {
   const [records, setRecords] = useState<APISoilHealthRecord[]>([]);
@@ -14,6 +15,8 @@ export default function SoilHealthMonitor() {
 
   useEffect(() => {
     loadSoilHealth();
+    // Track module access
+    moduleInteractionAPI.trackModuleAccess('SoilHealthMonitor').catch(console.error);
 
     // Join parcel room for real-time updates (assuming we have a way to get current parcel)
     // For now, we'll listen to all sensor updates

@@ -7,7 +7,10 @@ import {
   updateRecommendation,
   deleteRecommendation,
   generateAgricultureRecommendations,
-  chatWithRestorationAI
+  chatWithRestorationAI,
+  getTemperatures,
+  updateTemperature,
+  getEarthEngineData
 } from '../controllers/recommendationController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -48,9 +51,24 @@ router.delete('/:id', authenticateToken, deleteRecommendation);
 // @access  Private
 router.post('/parcel/:parcelId/agriculture', authenticateToken, generateAgricultureRecommendations);
 
+// @route   GET /api/recommendations/parcel/:parcelId/earth-engine
+// @desc    Get Google Earth Engine data for a parcel
+// @access  Private
+router.get('/parcel/:parcelId/earth-engine', authenticateToken, getEarthEngineData);
+
 // @route   POST /api/recommendations/parcel/:parcelId/chat
 // @desc    Chat with AI about restoration practices
 // @access  Private
 router.post('/parcel/:parcelId/chat', authenticateToken, chatWithRestorationAI);
+
+// @route   GET /api/recommendations/ai/temperatures
+// @desc    Get AI temperature settings for the current user
+// @access  Private
+router.get('/ai/temperatures', authenticateToken, getTemperatures);
+
+// @route   POST /api/recommendations/ai/temperatures
+// @desc    Update AI temperature setting for a task type
+// @access  Private
+router.post('/ai/temperatures', authenticateToken, updateTemperature);
 
 export default router;

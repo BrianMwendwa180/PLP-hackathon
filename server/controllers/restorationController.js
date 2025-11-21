@@ -1,9 +1,10 @@
 import RestorationActivity from '../models/RestorationActivity.js';
 import LandParcel from '../models/LandParcel.js';
+import UserModuleInteraction from '../models/UserModuleInteraction.js';
 
 export const createRestorationActivity = async (req, res) => {
   try {
-    const { parcelId, activityType, description, quantity, unit, carbonOffsetKg } = req.body;
+    const { parcelId, activityType, description, quantity, unit, carbonOffsetKg, accessedModule } = req.body;
 
     // Verify the land parcel exists and belongs to the user
     const landParcel = await LandParcel.findById(parcelId);
@@ -22,10 +23,24 @@ export const createRestorationActivity = async (req, res) => {
       quantity,
       unit,
       performedBy: req.user.userId,
-      carbonOffsetKg
+      carbonOffsetKg,
+      accessedModule
     });
 
     await restorationActivity.save();
+
+    // Track module interaction if accessedModule is provided
+    if (accessedModule) {
+      await UserModuleInteraction.findOneAndUpdate(
+        { userId: req.user.userId, moduleName: accessedModule },
+        {
+          $inc: { accessCount: 1 },
+          $set: { lastAccessed: new Date() }
+        },
+        { upsert: true, new: true }
+      );
+    }
+
     await restorationActivity.populate([
       { path: 'parcelId', select: 'name location' },
       { path: 'performedBy', select: 'fullName email' }
@@ -66,7 +81,7 @@ export const getRestorationActivitiesByParcel = async (req, res) => {
 
 export const getAllRestorationActivities = async (req, res) => {
   try {
-    const activities = await RestorationActivity.find()
+    const activities = await RestorationActivity.find({ performedBy: req.user.userId })
       .populate([
         { path: 'parcelId', select: 'name location' },
         { path: 'performedBy', select: 'fullName email' }
@@ -98,11 +113,11 @@ export const getRestorationActivityById = async (req, res) => {
 
 export const updateRestorationActivity = async (req, res) => {
   try {
-    const { activityType, description, quantity, unit, carbonOffsetKg, verificationStatus } = req.body;
+    const { activityType, description, quantity, unit, carbonOffsetKg, verificationStatus, accessedModule } = req.body;
 
     const activity = await RestorationActivity.findByIdAndUpdate(
       req.params.id,
-      { activityType, description, quantity, unit, carbonOffsetKg, verificationStatus },
+      { activityType, description, quantity, unit, carbonOffsetKg, verificationStatus, accessedModule },
       { new: true, runValidators: true }
     ).populate([
       { path: 'parcelId', select: 'name location' },
@@ -111,6 +126,18 @@ export const updateRestorationActivity = async (req, res) => {
 
     if (!activity) {
       return res.status(404).json({ message: 'Restoration activity not found' });
+    }
+
+    // Track module interaction if accessedModule is provided and changed
+    if (accessedModule) {
+      await UserModuleInteraction.findOneAndUpdate(
+        { userId: req.user.userId, moduleName: accessedModule },
+        {
+          $inc: { accessCount: 1 },
+          $set: { lastAccessed: new Date() }
+        },
+        { upsert: true, new: true }
+      );
     }
 
     res.json({ message: 'Restoration activity updated successfully', activity });

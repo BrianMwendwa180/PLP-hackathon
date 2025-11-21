@@ -38,7 +38,7 @@ api.interceptors.response.use(
 // Enhanced AI Recommendations API
 export const aiRecommendationsAPI = {
   generateComprehensiveRecommendations: (parcelId: string) =>
-    api.post<{ message: string; recommendations: any[]; metadata: any }>(`/recommendations/ai/generate/${parcelId}`),
+    api.post<{ recommendations: any[]; parcelId: string }>(`/recommendations/parcel/${parcelId}/agriculture`),
   getAIPredictions: (parcelId: string) =>
     api.get(`/recommendations/ai/predictions/${parcelId}`),
   getWeatherData: (parcelId: string) =>
@@ -49,6 +49,16 @@ export const aiRecommendationsAPI = {
   // Chat with AI about restoration
   chatWithRestorationAI: (parcelId: string, query: string, conversationHistory: any[] = []) =>
     api.post(`/recommendations/parcel/${parcelId}/chat`, { query, conversationHistory }),
+
+  // Earth Engine data
+  getEarthEngineData: (parcelId: string) =>
+    api.get<{ message: string; earthEngineData: EarthEngineData | null; parcelId: string }>(`/recommendations/parcel/${parcelId}/earth-engine`),
+
+  // Temperature settings
+  getTemperatures: () =>
+    api.get<TemperatureSettings>(`/recommendations/ai/temperatures`),
+  updateTemperature: (taskType: string, temperature: number) =>
+    api.post(`/recommendations/ai/temperatures`, { taskType, temperature }),
 };
 
 // Image Analysis API
@@ -133,6 +143,25 @@ export const sustainabilityAPI = {
   getRecommendations: (parcelId: string) =>
     api.get(`/sustainability/recommendations/${parcelId}`),
 };
+
+// Google Earth Engine interfaces
+export interface EarthEngineData {
+  ndvi: number | null;
+  landCover: string;
+  landCoverCode: number;
+  precipitation: number | null;
+  temperature: number | null;
+  analysisDate: string;
+  parcelCoordinates: { latitude: number; longitude: number };
+  confidence: number;
+}
+
+// Temperature settings interfaces
+export interface TemperatureSettings {
+  temperatures: { [taskType: string]: number };
+  defaults: { [taskType: string]: number };
+  userOverrides: { [taskType: string]: number };
+}
 
 // Enhanced Recommendation interfaces
 export interface EnhancedRecommendation {
@@ -235,5 +264,19 @@ export interface CarbonFootprint {
   netFootprint: number;
   lastCalculated: string;
 }
+
+export interface ModuleInteractionData {
+  moduleName: string;
+  accessCount: number;
+  lastAccessed: string;
+}
+
+// Module interaction API
+export const moduleInteractionAPI = {
+  trackModuleAccess: (moduleName: string) =>
+    api.post('/users/module-interaction', { moduleName }),
+  getUserModulePreferences: () =>
+    api.get<ModuleInteractionData[]>('/users/module-preferences'),
+};
 
 export default api;

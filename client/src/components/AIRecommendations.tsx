@@ -14,9 +14,22 @@ import {
   Leaf,
   Droplets,
   Bug,
-  Eye
+  Eye,
+  MessageSquare,
+  Send,
+  User,
+  Bot,
+  Settings,
+  ChevronDown,
+  ChevronUp,
+  Thermometer,
+  Satellite,
+  Activity,
+  MapPin,
+  Gauge,
+  Thermometer as TempIcon
 } from 'lucide-react';
-import { aiRecommendationsAPI, imageAnalysisAPI, backgroundProcessingAPI, type ImageAnalysisResult } from '../lib/enhancedApi';
+import { aiRecommendationsAPI, imageAnalysisAPI, backgroundProcessingAPI, type ImageAnalysisResult, type EarthEngineData } from '../lib/enhancedApi';
 import { landParcelsAPI, type LandParcel } from '../lib/api';
 
 export default function AIRecommendations() {
@@ -29,11 +42,36 @@ export default function AIRecommendations() {
   const [analysisType, setAnalysisType] = useState<string>('crop-disease');
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [generatedRecommendations, setGeneratedRecommendations] = useState<any[]>([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<any[]>([]);
+
+  // Temperature settings state
+  const [showTemperatureSettings, setShowTemperatureSettings] = useState(false);
+  const [temperatureSettings, setTemperatureSettings] = useState<{ [key: string]: number }>({});
+  const [updatingTemperature, setUpdatingTemperature] = useState<string | null>(null);
+
+  // Earth Engine data state
+  const [earthEngineData, setEarthEngineData] = useState<EarthEngineData | null>(null);
+  const [loadingEarthEngine, setLoadingEarthEngine] = useState(false);
 
   useEffect(() => {
     loadParcels();
     loadQueueStatus();
+    loadTemperatureSettings();
   }, []);
+
+  useEffect(() => {
+    if (selectedParcel) {
+      loadEarthEngineData();
+    }
+  }, [selectedParcel]);
 
   const loadParcels = async () => {
     try {
@@ -56,6 +94,43 @@ export default function AIRecommendations() {
     }
   };
 
+  const loadTemperatureSettings = async () => {
+    try {
+      const response = await aiRecommendationsAPI.getTemperatures();
+      setTemperatureSettings(response.data.temperatures);
+    } catch (error) {
+      console.error('Error loading temperature settings:', error);
+    }
+  };
+
+  const loadEarthEngineData = async () => {
+    if (!selectedParcel) return;
+
+    setLoadingEarthEngine(true);
+    try {
+      const response = await aiRecommendationsAPI.getEarthEngineData(selectedParcel);
+      setEarthEngineData(response.data.earthEngineData);
+    } catch (error) {
+      console.error('Error loading Earth Engine data:', error);
+      setEarthEngineData(null);
+    } finally {
+      setLoadingEarthEngine(false);
+    }
+  };
+
+  const updateTemperatureSetting = async (taskType: string, temperature: number) => {
+    setUpdatingTemperature(taskType);
+    try {
+      await aiRecommendationsAPI.updateTemperature(taskType, temperature);
+      setTemperatureSettings(prev => ({ ...prev, [taskType]: temperature }));
+    } catch (error) {
+      console.error('Error updating temperature:', error);
+      alert('Failed to update temperature setting. Please try again.');
+    } finally {
+      setUpdatingTemperature(null);
+    }
+  };
+
   const generateAIRecommendations = async () => {
     if (!selectedParcel) return;
 
@@ -64,9 +139,8 @@ export default function AIRecommendations() {
       const response = await aiRecommendationsAPI.generateComprehensiveRecommendations(selectedParcel);
       console.log('AI Recommendations generated:', response.data);
 
-      // Refresh recommendations list
-      // Note: In a real implementation, you'd want to refresh the recommendations from the API
-      alert('AI recommendations generated successfully! Check the Recommendations tab to view them.');
+      setGeneratedRecommendations(response.data.recommendations || []);
+      setShowRecommendations(true);
     } catch (error) {
       console.error('Error generating AI recommendations:', error);
       alert('Failed to generate AI recommendations. Please try again.');
@@ -153,6 +227,53 @@ export default function AIRecommendations() {
       case 'degradation': return 'Land Degradation Assessment';
       case 'batch': return 'Comprehensive Analysis';
       default: return type;
+    }
+  };
+
+  const getNDVIStatus = (ndvi: number | null) => {
+    if (ndvi === null) return { status: 'Unknown', color: 'text-gray-500', bgColor: 'bg-gray-100' };
+    if (ndvi >= 0.6) return { status: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100' };
+    if (ndvi >= 0.4) return { status: 'Good', color: 'text-blue-600', bgColor: 'bg-blue-100' };
+    if (ndvi >= 0.2) return { status: 'Moderate', color: 'text-yellow-600', bgColor: 'bg-yellow-100' };
+    return { status: 'Poor', color: 'text-red-600', bgColor: 'bg-red-100' };
+  };
+
+  const getLandCoverIcon = (landCover: string) => {
+    if (landCover.toLowerCase().includes('crop')) return <Leaf className="w-4 h-4" />;
+    if (landCover.toLowerCase().includes('grass')) return <Target className="w-4 h-4" />;
+    if (landCover.toLowerCase().includes('forest') || landCover.toLowerCase().includes('tree')) return <Cloud className="w-4 h-4" />;
+    if (landCover.toLowerCase().includes('water')) return <Droplets className="w-4 h-4" />;
+    if (landCover.toLowerCase().includes('built')) return <MapPin className="w-4 h-4" />;
+    return <Activity className="w-4 h-4" />;
+  };
+
+  const sendChatMessage = async () => {
+    if (!selectedParcel || !chatInput.trim()) return;
+
+    const userMessage = { role: 'user', content: chatInput.trim(), timestamp: new Date() };
+    setChatMessages(prev => [...prev, userMessage]);
+    setConversationHistory(prev => [...prev, userMessage]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const response = await aiRecommendationsAPI.chatWithRestorationAI(selectedParcel, userMessage.content, conversationHistory);
+      const aiMessage = { role: 'assistant', content: response.data.response, timestamp: new Date() };
+      setChatMessages(prev => [...prev, aiMessage]);
+      setConversationHistory(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      const errorMessage = { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', timestamp: new Date() };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleChatKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
     }
   };
 
@@ -329,6 +450,59 @@ export default function AIRecommendations() {
         </div>
       </div>
 
+      {/* Generated AI Recommendations */}
+      {showRecommendations && generatedRecommendations.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">AI Generated Recommendations</h3>
+            <button
+              onClick={() => setShowRecommendations(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="space-y-4">
+            {generatedRecommendations.map((rec, index) => (
+              <div key={index} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-1">{rec.title}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{rec.description}</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    rec.priority === 'high' ? 'bg-red-100 text-red-700' :
+                    rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {rec.priority?.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Type:</span>
+                    <p className="font-medium">{rec.recommendationType || rec.type}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Cost:</span>
+                    <p className="font-medium">${rec.estimatedCost || 0}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Time:</span>
+                    <p className="font-medium">{rec.estimatedTimeDays || 0} days</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Confidence:</span>
+                    <p className="font-medium">{Math.round((rec.aiConfidence || 0) * 100)}%</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Analysis Results */}
       {imageAnalysisResults.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -429,6 +603,205 @@ export default function AIRecommendations() {
         </div>
       )}
 
+      {/* AI Settings */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-orange-100 p-2 rounded-lg">
+              <Settings className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">AI Settings</h3>
+              <p className="text-sm text-gray-600">Customize AI temperature settings for different tasks</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowTemperatureSettings(!showTemperatureSettings)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            {showTemperatureSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {showTemperatureSettings ? 'Hide Settings' : 'Show Settings'}
+          </button>
+        </div>
+
+        {showTemperatureSettings && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(temperatureSettings).map(([taskType, temperature]) => (
+                <div key={taskType} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Thermometer className="w-4 h-4 text-orange-500" />
+                      <span className="font-medium text-gray-900 capitalize">
+                        {taskType.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <span className="text-sm font-mono text-gray-600">
+                      {temperature.toFixed(1)}
+                    </span>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="2.0"
+                    step="0.1"
+                    value={temperature}
+                    onChange={(e) => {
+                      const newTemp = parseFloat(e.target.value);
+                      setTemperatureSettings(prev => ({ ...prev, [taskType]: newTemp }));
+                    }}
+                    onMouseUp={() => updateTemperatureSetting(taskType, temperatureSettings[taskType])}
+                    disabled={updatingTemperature === taskType}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+
+                  <div className="flex justify-between text-xs text-gray-500 mt-2">
+                    <span>Deterministic (0.0)</span>
+                    <span>Creative (2.0)</span>
+                  </div>
+
+                  <p className="text-xs text-gray-600 mt-2">
+                    {temperature < 0.5 ? 'Low creativity: Factual, consistent responses' :
+                     temperature < 1.0 ? 'Balanced: Good mix of creativity and consistency' :
+                     'High creativity: Diverse, innovative responses'}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">Temperature Guide</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-blue-800">Recommendation (0.4)</span>
+                  <p className="text-blue-700">Balanced approach for land management advice</p>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-800">Chat (0.7)</span>
+                  <p className="text-blue-700">Conversational tone with some creativity</p>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-800">Prediction (0.1)</span>
+                  <p className="text-blue-700">Highly factual for degradation predictions</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* AI Chat Interface */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-green-100 p-2 rounded-lg">
+              <MessageSquare className="w-6 h-6 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900">AI Restoration Assistant</h3>
+              <p className="text-sm text-gray-600">Chat with AI for personalized land management advice</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            {showChat ? 'Hide Chat' : 'Show Chat'}
+          </button>
+        </div>
+
+        {showChat && (
+          <div className="space-y-4">
+            {/* Satellite Data Summary in Chat */}
+            {earthEngineData && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Satellite className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">Current Satellite Data</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <span className="text-blue-600">NDVI:</span>
+                    <span className="font-medium ml-1">{earthEngineData.ndvi?.toFixed(3) || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Land Cover:</span>
+                    <span className="font-medium ml-1">{earthEngineData.landCover}</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Rainfall:</span>
+                    <span className="font-medium ml-1">{earthEngineData.precipitation?.toFixed(1) || 'N/A'}mm</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-600">Temp:</span>
+                    <span className="font-medium ml-1">{earthEngineData.temperature?.toFixed(1) || 'N/A'}°C</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chat Messages */}
+            <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+              {chatMessages.length === 0 ? (
+                <p className="text-gray-500 text-center">Start a conversation with the AI assistant...</p>
+              ) : (
+                <div className="space-y-3">
+                  {chatMessages.map((message, index) => (
+                    <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      {message.role === 'assistant' && <Bot className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />}
+                      <div className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg ${
+                        message.role === 'user'
+                          ? 'bg-green-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-900'
+                      }`}>
+                        <p className="text-sm">{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {new Date(message.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                      {message.role === 'user' && <User className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />}
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="flex items-start gap-3 justify-start">
+                      <Bot className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                      <div className="bg-white border border-gray-200 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm text-gray-600">AI is thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyPress={handleChatKeyPress}
+                placeholder="Ask about land management, crop health, or restoration strategies..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                disabled={chatLoading}
+              />
+              <button
+                onClick={sendChatMessage}
+                disabled={!chatInput.trim() || chatLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Send
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Features Overview */}
       <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border border-green-200">
         <h3 className="font-semibold text-gray-900 mb-4">Enhanced AI Features</h3>
@@ -474,10 +847,10 @@ export default function AIRecommendations() {
           </div>
 
           <div className="flex items-start gap-3">
-            <Zap className="w-5 h-5 text-yellow-500 mt-1" />
+            <MessageSquare className="w-5 h-5 text-indigo-500 mt-1" />
             <div>
-              <h4 className="font-medium text-gray-900">Background Processing</h4>
-              <p className="text-sm text-gray-600">Asynchronous heavy computations</p>
+              <h4 className="font-medium text-gray-900">AI Chat Assistant</h4>
+              <p className="text-sm text-gray-600">Interactive AI for personalized advice</p>
             </div>
           </div>
         </div>
